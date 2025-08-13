@@ -12,6 +12,9 @@ jobs:
       matrix:
         platform: [linux, windows, mac]
         arch: [x64, arm64]
+        exclude:
+          - platform: windows
+            arch: arm64
     steps:
     - name: Set up Bun
       uses: oven-sh/setup-bun@v2

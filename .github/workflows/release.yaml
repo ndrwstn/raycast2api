@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [linux, windows, mac]
+        arch: [x64, arm64]
+    steps:
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Build
+      run: |
+        echo "Building for ${{ matrix.platform }}-${{ matrix.arch }}"
+        echo "Bun version: $(bun --version)"
+        echo "Bun target: bun-${{ matrix.platform }}-${{ matrix.arch }}"
+        bun install --frozen-lockfile --production
+        bun build server.ts --production --compile --target bun-${{ matrix.platform }}-${{ matrix.arch }} --outfile raycast2api-${{ matrix.platform }}-${{ matrix.arch }}
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: raycast2api-${{ matrix.platform }}-${{ matrix.arch }}
+        path: raycast2api-${{ matrix.platform }}-${{ matrix.arch }}
+
+    - name: Upload Artifact to Release
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        files: ./raycast2api-${{ matrix.platform }}-${{ matrix.arch }}

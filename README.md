@@ -8,6 +8,8 @@ This project is based on **[raycast-relay](https://github.com/szcharlesji/raycas
 
 ## Deployment
 
+> ⚠️ Be aware that not setting the API_KEY environment variable leaves your API open to anyone.
+
 ### Cloudflare Workers Deployment
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/xxxbrian/raycast2api)

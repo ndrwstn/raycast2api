@@ -1,55 +1,31 @@
 # Raycast2API
 
-Convert Raycast AI API to OpenAI-compatible API. Built with HonoJS, supports Raycast V2 authentication, deployable to Cloudflare Workers.
+Convert Raycast AI API to OpenAI-compatible API. Built with HonoJS, supports Raycast V2 authentication, deployable to **Cloudflare Workers / Docker / Local Binary**.
 
 ## About This Project
 
-This project is based on [szcharlesji/raycast-relay](https://github.com/szcharlesji/raycast-relay), which has been archived and is no longer maintained. The original project does not support the new Raycast V2 authentication system that is now required. This version utilizes HonoJS and provides support for Raycast V2 authentication.
+This project is based on **[raycast-relay](https://github.com/szcharlesji/raycast-relay)**, which has been archived and is no longer maintained. The original project does not support the new Raycast V2 authentication system that is now required. This version utilizes **Hono** and provides support for **Raycast V2 authentication**.
 
 ## Deployment
 
 ### Cloudflare Workers Deployment
 
-#### One-click deployment
-
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/xxxbrian/raycast2api)
 
-#### Manual deployment
-
-1. Clone repository:
-```bash
-git clone https://github.com/xxxbrian/raycast2api
-cd raycast2api
-```
-
-2. Install dependencies:
-```bash
-bun install
-```
-
-3. Configure environment variables:
-```bash
-wrangler secret put RAYCAST_BEARER_TOKEN
-wrangler secret put RAYCAST_DEVICE_ID
-wrangler secret put RAYCAST_SIGNATURE_SECRET
-
-# Optional
-wrangler secret put API_KEY
-wrangler secret put ADVANCED
-wrangler secret put INCLUDE_DEPRECATED
-```
-
-4. Deploy:
-```bash
-bun run deploy
-```
-
-### Local Development
+### Docker Deployment
 
 ```bash
-bun run dev        # Cloudflare Workers dev mode
-bun run dev:local  # Local dev mode
+docker run -d \
+  --name raycast2api \
+  -p 3000:3000 \
+  -e RAYCAST_BEARER_TOKEN=your-raycast-bearer-token \
+  -e RAYCAST_DEVICE_ID=your-raycast-device-id \
+  ghcr.io/xxxbrian/raycast2api:latest
 ```
+
+### Local Binary Deployment
+
+Download the latest release from [Releases](https://github.com/xxxbrian/raycast2api/releases) and run it.
 
 ## Configuration
 
@@ -102,8 +78,17 @@ src/
 └── handlers/
     ├── chat.ts        # Chat handler
     └── models.ts      # Models handler
+server.ts              # Bun server entry for local binary
 ```
 
-## License
+## Development
 
-GPL-3.0
+```bash
+bun run dev        # Cloudflare Workers dev mode
+bun run dev:local  # Local dev mode
+```
+
+## Credits
+
+- [raycast-relay](https://github.com/szcharlesji/raycast-relay)
+- [raycast2api](https://github.com/missuo/raycast2api)

@@ -108,7 +108,7 @@ function handleStreamingResponse(response: Response, requestedModelId: string): 
   (async () => {
     if (!response.body) {
       console.error("No response body from Raycast for streaming.");
-      await writer.close();
+      try { await writer.close(); } catch {}
       return;
     }
 
@@ -116,6 +116,7 @@ function handleStreamingResponse(response: Response, requestedModelId: string): 
     const decoder = new TextDecoder();
     let buffer = "";
     let streamFinished = false;
+    let aborted = false;
 
     try {
       while (!streamFinished) {
@@ -132,45 +133,66 @@ function handleStreamingResponse(response: Response, requestedModelId: string): 
           const line = buffer.substring(0, newlineIndex).trim();
           buffer = buffer.substring(newlineIndex + 1);
 
-          if (line.startsWith("data:")) {
-            const dataContent = line.substring(5).trim();
-            if (dataContent === "[DONE]") continue;
+          if (!line.startsWith("data:")) continue;
+
+          const dataContent = line.substring(5).trim();
+          if (dataContent === "[DONE]") {
+            streamFinished = true;
+            break;
+          }
+
+          try {
+            const jsonData: RaycastSSEData = JSON.parse(dataContent);
+            const chunk = {
+              id: `chatcmpl-${generateUUID()}`,
+              object: "chat.completion.chunk",
+              created: Math.floor(Date.now() / 1000),
+              model: requestedModelId,
+              choices: [
+                {
+                  index: 0,
+                  delta: { content: jsonData.text || "" },
+                  finish_reason: jsonData.finish_reason === undefined ? null : jsonData.finish_reason,
+                },
+              ],
+            };
 
             try {
-              const jsonData: RaycastSSEData = JSON.parse(dataContent);
-              const chunk = {
-                id: `chatcmpl-${generateUUID()}`,
-                object: "chat.completion.chunk",
-                created: Math.floor(Date.now() / 1000),
-                model: requestedModelId,
-                choices: [
-                  {
-                    index: 0,
-                    delta: { content: jsonData.text || "" },
-                    finish_reason: jsonData.finish_reason === undefined ? null : jsonData.finish_reason,
-                  },
-                ],
-              };
-
               await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-
-              if (jsonData.finish_reason !== null && jsonData.finish_reason !== undefined) {
-                streamFinished = true;
-              }
-            } catch (e) {
-              console.error("Failed to parse/process SSE chunk:", dataContent, "Error:", e);
+            } catch (writeError) {
+              console.error("Failed to write to client stream:", writeError);
+              aborted = true;
+              try { await writer.abort(writeError as any); } catch {}
+              streamFinished = true;
+              break;
             }
+
+            if (jsonData.finish_reason !== null && jsonData.finish_reason !== undefined) {
+              streamFinished = true;
+              break;
+            }
+          } catch (e) {
+            console.error("Failed to parse/process SSE chunk:", dataContent, "Error:", e);
           }
         }
       }
 
-      await writer.write(encoder.encode("data: [DONE]\n\n"));
+      if (!aborted) {
+        try { await writer.write(encoder.encode("data: [DONE]\n\n")); } catch (writeDoneError) {
+          console.error("Failed to write final [DONE] chunk:", writeDoneError);
+          aborted = true;
+          try { await writer.abort(writeDoneError as any); } catch {}
+        }
+      }
     } catch (error) {
       console.error("Error processing Raycast stream:", error);
-      await writer.abort(error);
+      if (!aborted) {
+        try { await writer.abort(error as any); } catch {}
+        aborted = true;
+      }
     } finally {
-      await writer.close();
-      reader.cancel().catch((e) => console.error("Error cancelling reader:", e));
+      if (!aborted) { try { await writer.close(); } catch {} }
+      try { await reader.cancel(); } catch (e) { console.error("Error cancelling reader:", e); }
     }
   })();
 

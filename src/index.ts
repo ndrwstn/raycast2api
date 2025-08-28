@@ -86,7 +86,22 @@ app.get("/ready", async (c) => {
   const envVars = env<Env>(c);
   const now = Date.now();
 
-  // If backend is working, return ready immediately
+  // FIRST: Check required configuration
+  if (
+    !envVars.RAYCAST_BEARER_TOKEN ||
+    !envVars.RAYCAST_DEVICE_ID ||
+    !envVars.RAYCAST_SIGNATURE_SECRET
+  ) {
+    return c.json(
+      {
+        status: "not ready",
+        reason: "missing_configuration",
+      },
+      503,
+    );
+  }
+
+  // THEN: Check if backend is working (only after config is validated)
   if (backendState.isWorking) {
     return c.json({ status: "ready" });
   }

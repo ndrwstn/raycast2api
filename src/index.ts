@@ -7,6 +7,9 @@ import { createErrorResponse, validateApiKey, fetchModels } from "./utils";
 import { handleChatCompletions } from "./handlers/chat";
 import { handleModels } from "./handlers/models";
 
+// Rate limiting configuration
+const READINESS_CHECK_INTERVAL_MS = 30000; // 30 seconds
+
 // Simple backend state tracking
 export const backendState = {
   isWorking: true, // Optimistic default
@@ -72,7 +75,11 @@ app.get("/health", (c) => {
   const envVars = env<Env>(c);
 
   // Simple config check - no external API calls
-  if (!envVars.RAYCAST_BEARER_TOKEN || !envVars.RAYCAST_DEVICE_ID) {
+  if (
+    !envVars.RAYCAST_BEARER_TOKEN ||
+    !envVars.RAYCAST_DEVICE_ID ||
+    !envVars.RAYCAST_SIGNATURE_SECRET
+  ) {
     return c.json(
       { status: "error", message: "Missing required configuration" },
       503,
@@ -107,7 +114,7 @@ app.get("/ready", async (c) => {
   }
 
   // Rate limiting: only check every 30 seconds when not working
-  if (now - backendState.lastCheckTime < 30000) {
+  if (now - backendState.lastCheckTime < READINESS_CHECK_INTERVAL_MS) {
     return c.json(
       {
         status: "not ready",
@@ -117,7 +124,10 @@ app.get("/ready", async (c) => {
     );
   }
 
-  // Test Raycast API when not working and rate limit allows
+  // Test Raycast API connectivity for readiness check
+  // Note: fetchModels() currently handles its own errors and returns empty Map,
+  // but this try-catch provides defensive programming in case fetchModels() is
+  // refactored to throw exceptions in the future
   try {
     backendState.lastCheckTime = now;
     const models = await fetchModels(envVars);
@@ -137,6 +147,7 @@ app.get("/ready", async (c) => {
       );
     }
   } catch (error: any) {
+    // Defensive catch: handles potential future changes to fetchModels() behavior
     backendState.lastFailureTime = now;
     return c.json(
       {
